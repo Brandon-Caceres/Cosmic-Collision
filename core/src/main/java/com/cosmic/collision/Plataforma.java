@@ -7,7 +7,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 
 public class Plataforma extends ObjetoJuego implements Colisionable {
-    private float velPxPorSeg = 600f;
+    private float velPxPorSeg = 700f;
 
     public Plataforma(int x, int y, int ancho, int alto) {
         super(x, y, ancho, alto);
@@ -32,7 +32,7 @@ public class Plataforma extends ObjetoJuego implements Colisionable {
     public void alChocarConBola(BolaPing bola) {
         bola.setColor(Color.GREEN);
         int centro = x + ancho / 2;
-        int dif = bola.x - centro; // mismo paquete => acceso protegido
+        int dif = bola.x - centro;
         if (Math.abs(dif) > 0) {
             int signo = dif > 0 ? 1 : -1;
             bola.setXY(bola.x + signo * Math.min(4, Math.abs(dif) / 6), bola.y);

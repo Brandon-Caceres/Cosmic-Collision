@@ -14,6 +14,10 @@ public class Bloque extends ObjetoJuego implements Colisionable {
         this(x, y, ancho, alto, 1, false, new Color(0.7f, 0.2f, 0.9f, 1f));
     }
 
+    public Bloque(int x, int y, int ancho, int alto, int hp, boolean irrompible) {
+        this(x, y, ancho, alto, hp, irrompible, new Color(0.7f, 0.2f, 0.9f, 1f));
+    }
+
     public Bloque(int x, int y, int ancho, int alto, int hp, boolean irrompible, Color base) {
         super(x, y, ancho, alto);
         this.irrompible = irrompible;
@@ -22,10 +26,7 @@ public class Bloque extends ObjetoJuego implements Colisionable {
         this.base = base;
     }
 
-    public boolean estaDestruido() { return destruido; }
-
     @Override public Rectangle getRect() { return new Rectangle(x, y, ancho, alto); }
-
     @Override public void alChocarConBola(BolaPing bola) { recibirImpacto(); }
 
     public void recibirImpacto() {
@@ -33,6 +34,8 @@ public class Bloque extends ObjetoJuego implements Colisionable {
         hp--;
         if (hp <= 0) destruido = true;
     }
+
+    public boolean estaDestruido() { return destruido; }
 
     @Override
     public void dibujar(ShapeRenderer sr) {
