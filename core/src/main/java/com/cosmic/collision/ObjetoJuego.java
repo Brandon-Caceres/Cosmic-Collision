@@ -1,6 +1,7 @@
 package com.cosmic.collision;
 
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 
 public abstract class ObjetoJuego {
     protected int x;
@@ -25,5 +26,6 @@ public abstract class ObjetoJuego {
 
     public void actualizar() {}
 
-    public abstract void dibujar(ShapeRenderer sr);
+    public void dibujar(ShapeRenderer sr) {}
+    public void dibujar(SpriteBatch batch) {}
 }

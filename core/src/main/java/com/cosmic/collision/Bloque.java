@@ -23,6 +23,7 @@ public class Bloque extends ObjetoJuego implements Colisionable {
         this.irrompible = irrompible;
         this.hp = Math.max(1, hp);
         this.destruido = false;
+        
         this.texturaNormal = tx1;
         this.texturaResistente2 = tx2;
         this.texturaResistente3 = tx3;
@@ -30,10 +31,14 @@ public class Bloque extends ObjetoJuego implements Colisionable {
     }
     
     @Override
-    public Rectangle getRect() { return new Rectangle(x, y, ancho, alto); }
+    public Rectangle getRect() {
+        return new Rectangle(x, y, ancho, alto);
+    }
 
     @Override
-    public void alChocarConBola(BolaPing bola) { recibirImpacto(); }
+    public void alChocarConBola(BolaPing bola) {
+        recibirImpacto();
+    }
 
     public void recibirImpacto() {
         if (destruido) return;
