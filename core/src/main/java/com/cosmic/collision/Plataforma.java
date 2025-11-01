@@ -2,15 +2,18 @@ package com.cosmic.collision;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 
 public class Plataforma extends ObjetoJuego implements Colisionable {
     private float velPxPorSeg = 700f;
+    private final Texture texture;
 
-    public Plataforma(int x, int y, int ancho, int alto) {
+    public Plataforma(int x, int y, int ancho, int alto, Texture texture) {
         super(x, y, ancho, alto);
+        this.texture = texture;
     }
 
     public void setVelPxPorSeg(float v) { this.velPxPorSeg = v; }
@@ -39,9 +42,7 @@ public class Plataforma extends ObjetoJuego implements Colisionable {
         }
     }
 
-    @Override
-    public void dibujar(ShapeRenderer sr) {
-        sr.setColor(Color.BLUE);
-        sr.rect(x, y, ancho, alto);
+    public void dibujar(SpriteBatch batch) {
+        batch.draw(texture, x, y, ancho, alto);
     }
 }

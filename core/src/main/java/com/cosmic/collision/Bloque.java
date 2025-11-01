@@ -1,29 +1,32 @@
 package com.cosmic.collision;
 
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Rectangle;
 
 public class Bloque extends ObjetoJuego implements Colisionable {
     private boolean destruido;
     private boolean irrompible;
     private int hp;
-    private final Color base;
 
-    public Bloque(int x, int y, int ancho, int alto) {
-        this(x, y, ancho, alto, 1, false, new Color(0.7f, 0.2f, 0.9f, 1f));
+    private final Texture texturaNormal;
+    private final Texture texturaResistente2;
+    private final Texture texturaResistente3;
+    private final Texture texturaIrrompible;
+
+    public Bloque(int x, int y, int ancho, int alto, Texture tx1, Texture tx2, Texture tx3, Texture txU) {
+        this(x, y, ancho, alto, 1, false, tx1, tx2, tx3, txU);
     }
 
-    public Bloque(int x, int y, int ancho, int alto, int hp, boolean irrompible) {
-        this(x, y, ancho, alto, hp, irrompible, new Color(0.7f, 0.2f, 0.9f, 1f));
-    }
-
-    public Bloque(int x, int y, int ancho, int alto, int hp, boolean irrompible, Color base) {
+    public Bloque(int x, int y, int ancho, int alto, int hp, boolean irrompible, Texture tx1, Texture tx2, Texture tx3, Texture txU) {
         super(x, y, ancho, alto);
         this.irrompible = irrompible;
         this.hp = Math.max(1, hp);
         this.destruido = false;
-        this.base = base;
+        this.texturaNormal = tx1;
+        this.texturaResistente2 = tx2;
+        this.texturaResistente3 = tx3;
+        this.texturaIrrompible = txU;
     }
 
     @Override public Rectangle getRect() { return new Rectangle(x, y, ancho, alto); }
@@ -37,17 +40,13 @@ public class Bloque extends ObjetoJuego implements Colisionable {
 
     public boolean estaDestruido() { return destruido; }
 
-    @Override
-    public void dibujar(ShapeRenderer sr) {
+    public void dibujar(SpriteBatch batch) {
         if (destruido) return;
-        if (irrompible) {
-            sr.setColor(Color.DARK_GRAY);
-        } else if (hp >= 2) {
-            float f = Math.max(0.45f, 1f - 0.18f * (hp - 1));
-            sr.setColor(base.r * f, base.g * f, base.b * f, 1f);
-        } else {
-            sr.setColor(base);
-        }
-        sr.rect(x, y, ancho, alto);
+        Texture t;
+        if (irrompible) t = texturaIrrompible;
+        else if (hp >= 3) t = texturaResistente3;
+        else if (hp == 2) t = texturaResistente2;
+        else t = texturaNormal;
+        batch.draw(t, x, y, ancho, alto);
     }
 }
