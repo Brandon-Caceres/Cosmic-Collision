@@ -8,16 +8,16 @@ public class Bloque extends ObjetoJuego implements Colisionable {
     private boolean destruido;
     private boolean irrompible;
     private int hp;
-
-    private final Texture texturaNormal;
-    private final Texture texturaResistente2;
-    private final Texture texturaResistente3;
-    private final Texture texturaIrrompible;
+    
+    private Texture texturaNormal;
+    private Texture texturaResistente2;
+    private Texture texturaResistente3;
+    private Texture texturaIrrompible;
 
     public Bloque(int x, int y, int ancho, int alto, Texture tx1, Texture tx2, Texture tx3, Texture txU) {
         this(x, y, ancho, alto, 1, false, tx1, tx2, tx3, txU);
     }
-
+    
     public Bloque(int x, int y, int ancho, int alto, int hp, boolean irrompible, Texture tx1, Texture tx2, Texture tx3, Texture txU) {
         super(x, y, ancho, alto);
         this.irrompible = irrompible;
@@ -28,25 +28,49 @@ public class Bloque extends ObjetoJuego implements Colisionable {
         this.texturaResistente3 = tx3;
         this.texturaIrrompible = txU;
     }
+    
+    @Override
+    public Rectangle getRect() { return new Rectangle(x, y, ancho, alto); }
 
-    @Override public Rectangle getRect() { return new Rectangle(x, y, ancho, alto); }
-    @Override public void alChocarConBola(BolaPing bola) { recibirImpacto(); }
+    @Override
+    public void alChocarConBola(BolaPing bola) { recibirImpacto(); }
 
     public void recibirImpacto() {
-        if (destruido || irrompible) return;
+        if (destruido) return;
+        if (irrompible) return;
         hp--;
         if (hp <= 0) destruido = true;
     }
 
     public boolean estaDestruido() { return destruido; }
+    public boolean esIrrompible() { return irrompible; }
+    public int getHp() { return hp; }
 
-    public void dibujar(SpriteBatch batch) {
-        if (destruido) return;
-        Texture t;
-        if (irrompible) t = texturaIrrompible;
-        else if (hp >= 3) t = texturaResistente3;
-        else if (hp == 2) t = texturaResistente2;
-        else t = texturaNormal;
-        batch.draw(t, x, y, ancho, alto);
+    public void destruir() {
+        if (!irrompible) {
+            destruido = true;
+            hp = 0;
+        }
+    }
+
+    public void dibujar(SpriteBatch batch) { 
+        Texture texturaActual = null;
+        
+        if (irrompible) {
+            texturaActual = texturaIrrompible;
+        } 
+        else {
+            if (hp == 3) {
+                texturaActual = texturaResistente3;
+            } else if (hp == 2) {
+                texturaActual = texturaResistente2;
+            } else {
+                texturaActual = texturaNormal; 
+            }
+        }
+        
+        if (texturaActual != null) {
+            batch.draw(texturaActual, x, y, ancho, alto);
+        }
     }
 }
