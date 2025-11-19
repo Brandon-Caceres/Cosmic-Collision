@@ -5,7 +5,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Rectangle;
 
 /**
- * Bloque (asteroide). Mantiene la misma lógica de vida / irrompible.
+ * Bloque (asteroide).
  */
 public class Bloque extends ObjetoJuego implements Colisionable {
     private boolean destruido;
@@ -27,7 +27,6 @@ public class Bloque extends ObjetoJuego implements Colisionable {
         this.irrompible = irrompible;
         this.hp = Math.max(1, hp);
         this.destruido = false;
-
         this.texturaNormal = tx1;
         this.texturaResistente2 = tx2;
         this.texturaResistente3 = tx3;
@@ -36,7 +35,7 @@ public class Bloque extends ObjetoJuego implements Colisionable {
 
     @Override
     public void actualizar() {
-        // No hay lógica dinámica por cuadro para el bloque.
+        // Sin lógica dinámica
     }
 
     @Override
@@ -66,6 +65,7 @@ public class Bloque extends ObjetoJuego implements Colisionable {
         }
     }
 
+    @Override
     public void dibujar(SpriteBatch batch) {
         Texture texturaActual;
         if (irrompible) {

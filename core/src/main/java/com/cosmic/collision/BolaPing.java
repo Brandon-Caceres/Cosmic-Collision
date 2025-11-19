@@ -6,7 +6,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 
 /**
- * Pelota con la misma lógica original de rebotes y arranque.
+ * Pelota (bola). Usa ShapeRenderer para dibujarse.
  */
 public class BolaPing extends ObjetoJuego {
     private int radio;
@@ -27,8 +27,11 @@ public class BolaPing extends ObjetoJuego {
     public void setEstaQuieta(boolean b) { quieta = b; }
     public void setXY(int nx, int ny) { this.x = nx; this.y = ny; }
     public int getY() { return y; }
+    public int getX() { return x; }
+    public int getRadio() { return radio; }
     public void setColor(Color c) { this.color = c; }
 
+    @Override
     public void dibujar(ShapeRenderer sr) {
         sr.setColor(color);
         sr.circle(x, y, radio);

@@ -1,5 +1,8 @@
 package com.cosmic.collision;
 
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+
 /**
  * Clase base abstracta para objetos del juego.
  * Se exige implementar actualizar() para favorecer la extensibilidad.
@@ -23,4 +26,10 @@ public abstract class ObjetoJuego {
     public int getAlto() { return alto; }
 
     public abstract void actualizar();
+    
+    // Dibujo con ShapeRenderer (por defecto vacío)
+    public void dibujar(ShapeRenderer sr) {}
+
+    // Dibujo con SpriteBatch (por defecto vacío)
+    public void dibujar(SpriteBatch batch) {}
 }

@@ -8,7 +8,7 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 
 /**
- * Paleta (nave) con mismo control original.
+ * Paleta (nave) dibujada con SpriteBatch.
  */
 public class Plataforma extends ObjetoJuego implements Colisionable {
     private float velPxPorSeg = 200f;
@@ -19,13 +19,8 @@ public class Plataforma extends ObjetoJuego implements Colisionable {
         this.texture = texture;
     }
 
-    public void setVelPxPorSeg(float v) {
-        this.velPxPorSeg = v;
-    }
-
-    public void setTexture(Texture tx) {
-        this.texture = tx;
-    }
+    public void setVelPxPorSeg(float v) { this.velPxPorSeg = v; }
+    public void setTexture(Texture tx) { this.texture = tx; }
 
     @Override
     public void actualizar() {
@@ -55,13 +50,14 @@ public class Plataforma extends ObjetoJuego implements Colisionable {
     public void alChocarConBola(BolaPing bola) {
         bola.setColor(Color.GREEN);
         int centro = x + ancho / 2;
-        int dif = bola.x - centro;
+        int dif = bola.getX() - centro;
         if (Math.abs(dif) > 0) {
             int signo = dif > 0 ? 1 : -1;
-            bola.setXY(bola.x + signo * Math.min(4, Math.abs(dif) / 6), bola.y);
+            bola.setXY(bola.getX() + signo * Math.min(4, Math.abs(dif) / 6), bola.getY());
         }
     }
 
+    @Override
     public void dibujar(SpriteBatch batch) {
         if (texture != null) {
             batch.draw(texture, x, y, ancho, alto);
