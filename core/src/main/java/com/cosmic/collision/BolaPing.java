@@ -5,6 +5,9 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 
+/**
+ * Pelota con la misma lógica original de rebotes y arranque.
+ */
 public class BolaPing extends ObjetoJuego {
     private int radio;
     private int velX;
@@ -26,7 +29,6 @@ public class BolaPing extends ObjetoJuego {
     public int getY() { return y; }
     public void setColor(Color c) { this.color = c; }
 
-    @Override
     public void dibujar(ShapeRenderer sr) {
         sr.setColor(color);
         sr.circle(x, y, radio);
@@ -37,6 +39,7 @@ public class BolaPing extends ObjetoJuego {
         if (quieta) return;
         x += velX;
         y += velY;
+
         if (x - radio < 0) {
             x = radio;
             velX = -velX;
@@ -44,6 +47,7 @@ public class BolaPing extends ObjetoJuego {
             x = Gdx.graphics.getWidth() - radio;
             velX = -velX;
         }
+
         if (y + radio > Gdx.graphics.getHeight()) {
             y = Gdx.graphics.getHeight() - radio;
             velY = -velY;
