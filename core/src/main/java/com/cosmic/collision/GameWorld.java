@@ -10,6 +10,10 @@ import java.util.List;
 
 /**
  * Mundo de juego con soporte de power-ups que caen al destruir bloques.
+ * Ajustes:
+ * - probDropPowerUp: probabilidad base por bloque de soltar algún power-up.
+ * - getProbDropPowerUpForDifficulty(): reduce/incrementa esa probabilidad según dificultad.
+ * - sortearTipoPowerUp(): devuelve un tipo según distribución por dificultad y sesgo por nivel.
  */
 public class GameWorld {
 
@@ -34,7 +38,10 @@ public class GameWorld {
 
     // Power-ups
     private final List<PowerUp> powerUps = new ArrayList<>();
-    private final float probDropPowerUp = 0.25f; // 25% por bloque destruido
+
+    // Probabilidad base de que un bloque suelte un power-up (por bloque destruido).
+    // Este valor se ajusta por dificultad via getProbDropPowerUpForDifficulty().
+    private float probDropPowerUp = 0.18f; // 18% base
 
     // Bola explosiva
     private boolean bolaExplosivaActiva = false;
@@ -236,7 +243,9 @@ public class GameWorld {
     // --------------------- LÓGICA DE POWER-UPS ----------------------
 
     private void intentarSoltarPowerUp(Bloque b) {
-        if (Math.random() < probDropPowerUp) {
+        // Ajusta la probabilidad por dificultad
+        float prob = getProbDropPowerUpForDifficulty();
+        if (Math.random() < prob) {
             PowerUpType tipo = sortearTipoPowerUp();
             int size = 22;
             int px = b.getX() + b.getAncho()/2 - size/2;
@@ -245,13 +254,76 @@ public class GameWorld {
         }
     }
 
+
+    private float getProbDropPowerUpForDifficulty() {
+        switch (settings.dificultad) {
+            case FACIL:
+                return probDropPowerUp * 1.25f; // más frecuentes en fácil
+            case MEDIA:
+                return probDropPowerUp;         // base para media
+            case DIFICIL:
+                return probDropPowerUp * 0.7f;  // menos en difícil
+            default:
+                return probDropPowerUp;
+        }
+    }
+
     private PowerUpType sortearTipoPowerUp() {
-        // Distribución simple: ajusta a gusto
+        // Probabilidades base por dificultad (suman 1.0)
+        double grow, shrink, explosive, life;
+
+        switch (settings.dificultad) {
+            case FACIL:
+                grow = 0.50;
+                shrink = 0.10;
+                explosive = 0.20;
+                life = 0.20;
+                break;
+            case MEDIA:
+                grow = 0.35;
+                shrink = 0.25;
+                explosive = 0.20;
+                life = 0.20;
+                break;
+            case DIFICIL:
+                grow = 0.20;
+                shrink = 0.50;
+                explosive = 0.20;
+                life = 0.10;
+                break;
+            default:
+                grow = 0.35; shrink = 0.25; explosive = 0.20; life = 0.20;
+        }
+
+        double levelSkew = Math.min(0.25, Math.max(0.0, (nivel - 1) * 0.02));
+
+        double utilesSum = grow + life;
+        if (utilesSum > 0 && levelSkew > 0) {
+            double reducTotal = utilesSum * levelSkew;
+            double growRed = (grow / utilesSum) * reducTotal;
+            double lifeRed = (life / utilesSum) * reducTotal;
+
+            grow = Math.max(0.0, grow - growRed);
+            life = Math.max(0.0, life - lifeRed);
+
+            shrink += growRed + lifeRed;
+        }
+
+        // Normalizar (por seguridad)
+        double suma = grow + shrink + explosive + life;
+        if (suma <= 0) {
+            // fallback
+            return PowerUpType.PADDLE_SHRINK;
+        }
+        grow /= suma; shrink /= suma; explosive /= suma; life /= suma;
+
         double r = Math.random();
-        if (r < 0.30) return PowerUpType.PADDLE_GROW;      // 30%
-        if (r < 0.50) return PowerUpType.PADDLE_SHRINK;    // 20%
-        if (r < 0.75) return PowerUpType.EXTRA_LIFE;       // 25%
-        return PowerUpType.EXPLOSIVE_BALL;                 // 25%
+        if (r < grow) return PowerUpType.PADDLE_GROW;
+        r -= grow;
+        if (r < shrink) return PowerUpType.PADDLE_SHRINK;
+        r -= shrink;
+        if (r < explosive) return PowerUpType.EXPLOSIVE_BALL;
+        return PowerUpType.EXTRA_LIFE;
     }
 
     private void actualizarYAplicarPowerUps() {
@@ -282,13 +354,20 @@ public class GameWorld {
                 break;
             case PADDLE_GROW: {
                 int nuevoAncho = Math.min(260, paleta.getAncho() + 30);
-                paleta = new Plataforma(paleta.getX(), paleta.getY(), nuevoAncho, paleta.getAlto(), texturaPaleta);
+                // Mantener centrado al cambiar ancho
+                float centro = paleta.getX() + paleta.getAncho() / 2f;
+                int nuevoX = Math.round(centro - nuevoAncho / 2f);
+                nuevoX = Math.max(0, Math.min(nuevoX, Gdx.graphics.getWidth() - nuevoAncho));
+                paleta = new Plataforma(nuevoX, paleta.getY(), nuevoAncho, paleta.getAlto(), texturaPaleta);
                 paleta.setVelPxPorSeg(settings.velocidadPaleta);
                 break;
             }
             case PADDLE_SHRINK: {
                 int nuevoAncho = Math.max(50, paleta.getAncho() - 30);
-                paleta = new Plataforma(paleta.getX(), paleta.getY(), nuevoAncho, paleta.getAlto(), texturaPaleta);
+                float centro = paleta.getX() + paleta.getAncho() / 2f;
+                int nuevoX = Math.round(centro - nuevoAncho / 2f);
+                nuevoX = Math.max(0, Math.min(nuevoX, Gdx.graphics.getWidth() - nuevoAncho));
+                paleta = new Plataforma(nuevoX, paleta.getY(), nuevoAncho, paleta.getAlto(), texturaPaleta);
                 paleta.setVelPxPorSeg(settings.velocidadPaleta);
                 break;
             }
@@ -346,4 +425,9 @@ public class GameWorld {
         if (v > b) return b;
         return v;
     }
+
+    public void setProbDropPowerUp(float prob) {
+        this.probDropPowerUp = Math.max(0f, Math.min(1f, prob));
+    }
+
 }
