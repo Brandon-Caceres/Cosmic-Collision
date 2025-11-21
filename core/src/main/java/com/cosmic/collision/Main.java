@@ -57,7 +57,6 @@ public class Main extends ApplicationAdapter {
         fuenteHUD = new BitmapFont();
         fuenteHUD.getData().setScale(2.0f);
 
-        // Carga texturas vía ResourceManager (singleton)
         ResourceManager rm = ResourceManager.getInstance();
         texturaFondo = rm.getTexture("fondo", "espacio.jpg");
         texturaPaleta = rm.getTexture("paleta", "nave.png");
@@ -69,9 +68,10 @@ public class Main extends ApplicationAdapter {
         ajustes = new DifficultySettings(dificultadActual);
         hud = new HUD(fuenteHUD);
 
-        blockFactory = new BlockFactory(texturaAsteroideNormal, texturaAsteroideDuro2, texturaAsteroideDuro3, texturaAsteroideIrrompible);
+        blockFactory = new DefaultBlockFactory(texturaAsteroideNormal, texturaAsteroideDuro2, texturaAsteroideDuro3, texturaAsteroideIrrompible);
         mundo = new GameWorld(blockFactory, hud, ajustes, duracionBonificacionVida, texturaPaleta);
 
+        // Pantallas con API clásica (a migrar en commit 4 - Template Method)
         menu = new MenuScreen(fuenteUI, new MenuScreen.Listener() {
             @Override public void onElegirDificultad(Dificultad d) {
                 dificultadActual = d;
@@ -126,7 +126,6 @@ public class Main extends ApplicationAdapter {
 
             case PAUSADO:
                 dibujarFondo();
-                // Dibujar estado actual sin actualizar
                 mundo.dibujar(lote, formas, camara.viewportWidth, camara.viewportHeight);
                 pausa.render(lote, formas, camara.viewportWidth, camara.viewportHeight);
                 pausa.handleInput();
