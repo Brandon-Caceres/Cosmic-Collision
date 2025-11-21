@@ -18,7 +18,7 @@ import java.util.List;
  * - bola explosiva (área)
  * - SPEED_UP / SPEED_DOWN (temporal)
  * - PADDLE_GROW / PADDLE_SHRINK (temporal)
- * - lógica por dificultad para probabilidad y distribución de power-ups
+ * - lógica por dificultad delegada a DifficultyStrategy
  */
 public class GameWorld {
 
@@ -45,7 +45,6 @@ public class GameWorld {
     private final List<PowerUp> powerUps = new ArrayList<>();
 
     // Probabilidad base de que un bloque suelte un power-up (por bloque destruido).
-    // Ajustable mediante setProbDropPowerUp(...)
     private float probDropPowerUp = 0.25f; // 25% base
 
     // Bola explosiva
@@ -58,10 +57,11 @@ public class GameWorld {
     private long bolaSpeedExpiraMs = 0L;
 
     // ---- Temporal paddle size (duración según dificultad) ----
-    // Si != null => tamaño temporal activo y contiene el ancho ORIGINAL a restaurar.
     private Integer paletaAnchoOriginal = null;
-    // momento en ms que expira el tamaño temporal
     private long paletaTamanoExpiraMs = 0L;
+
+    // Strategy
+    private DifficultyStrategy difficultyStrategy = null;
 
     public GameWorld(BlockFactory factory,
                      HUD hud,
@@ -73,11 +73,26 @@ public class GameWorld {
         this.settings = initialSettings;
         this.duracionBonificacionVida = duracionBonificacionVida;
         this.texturaPaleta = texturaPaleta;
+
+        // inicializar estrategia según settings
+        this.difficultyStrategy = strategyFor(initialSettings.dificultad);
+
         iniciarJuego();
+    }
+
+    // --- Strategy helper ---
+    private DifficultyStrategy strategyFor(Dificultad d) {
+        switch (d) {
+            case FACIL: return new EasyStrategy();
+            case MEDIA: return new MediumStrategy();
+            case DIFICIL: return new HardStrategy();
+            default: return new MediumStrategy();
+        }
     }
 
     public void aplicarDificultad(DifficultySettings nueva) {
         this.settings = nueva;
+        this.difficultyStrategy = strategyFor(nueva.dificultad);
     }
 
     public void iniciarJuego() {
@@ -137,7 +152,6 @@ public class GameWorld {
             bolaExplosivaActiva = false;
         }
         if (bolaSpeedMultiplicador != null && ahora >= bolaSpeedExpiraMs) {
-            // restaurar velocidad base en todas las bolas
             for (BolaPing b : pelotas) b.restaurarVelBase();
             bolaSpeedMultiplicador = null;
             bolaSpeedExpiraMs = 0L;
@@ -273,6 +287,10 @@ public class GameWorld {
     }
 
     private float getProbDropPowerUpForDifficulty() {
+        if (difficultyStrategy != null) {
+            return probDropPowerUp * difficultyStrategy.getProbDropModifier();
+        }
+        // fallback
         switch (settings.dificultad) {
             case FACIL: return probDropPowerUp * 1.25f;
             case MEDIA: return probDropPowerUp;
@@ -282,30 +300,35 @@ public class GameWorld {
     }
 
     /**
-     * Sortea tipo de power-up según dificultad y nivel.
-     * Incluye SPLIT_BALL, SPEED_UP y SPEED_DOWN en la distribución.
+     * Sortea tipo de power-up usando la estrategia si está disponible.
      */
     private PowerUpType sortearTipoPowerUp() {
-        // probabilidades base por dificultad (suman aproximadamente 1.0)
         double grow, shrink, explosive, life, split, sUp, sDown;
 
-        switch (settings.dificultad) {
-            case FACIL:
-                grow = 0.40; shrink = 0.10; explosive = 0.15; life = 0.20; split = 0.10; sUp = 0.03; sDown = 0.02;
-                break;
-            case MEDIA:
-                grow = 0.30; shrink = 0.20; explosive = 0.15; life = 0.15; split = 0.12; sUp = 0.05; sDown = 0.03;
-                break;
-            case DIFICIL:
-                grow = 0.15; shrink = 0.45; explosive = 0.15; life = 0.05; split = 0.12; sUp = 0.06; sDown = 0.02;
-                break;
-            default:
-                grow = 0.30; shrink = 0.25; explosive = 0.15; life = 0.15; split = 0.10; sUp = 0.03; sDown = 0.02;
+        if (difficultyStrategy != null) {
+            PowerUpDistribution d = difficultyStrategy.getBaseDistribution();
+            grow = d.grow; shrink = d.shrink; explosive = d.explosive; life = d.life;
+            split = d.split; sUp = d.speedUp; sDown = d.speedDown;
+        } else {
+            // fallback values (original)
+            switch (settings.dificultad) {
+                case FACIL:
+                    grow = 0.40; shrink = 0.10; explosive = 0.15; life = 0.20; split = 0.10; sUp = 0.03; sDown = 0.02;
+                    break;
+                case MEDIA:
+                    grow = 0.30; shrink = 0.20; explosive = 0.15; life = 0.15; split = 0.12; sUp = 0.05; sDown = 0.03;
+                    break;
+                case DIFICIL:
+                    grow = 0.15; shrink = 0.45; explosive = 0.15; life = 0.05; split = 0.12; sUp = 0.06; sDown = 0.02;
+                    break;
+                default:
+                    grow = 0.30; shrink = 0.25; explosive = 0.15; life = 0.15; split = 0.10; sUp = 0.03; sDown = 0.02;
+            }
         }
 
-        // Sesgo por nivel: a más nivel, menos chance de útiles (grow + life + sUp) y más a shrink
+        // Sesgo por nivel
         double levelSkew = Math.min(0.25, Math.max(0.0, (nivel - 1) * 0.02));
-        double utilesSum = grow + life + sUp; // consideramos sUp como "útil"
+        double utilesSum = grow + life + sUp;
         if (utilesSum > 0 && levelSkew > 0) {
             double reducTotal = utilesSum * levelSkew;
             double growRed = (grow / utilesSum) * reducTotal;
@@ -406,10 +429,6 @@ public class GameWorld {
         }
     }
 
-    /**
-     * Split: por cada bola existente, añadimos 2 bolas más con direcciones distintas.
-     * Comportamiento: SUMA nuevas bolas a las existentes (más presión).
-     */
     private void splitBalls() {
         List<BolaPing> nuevas = new ArrayList<>();
         for (BolaPing b : pelotas) {
@@ -418,12 +437,10 @@ public class GameWorld {
             int speedX = Math.max(2, Math.abs(velPelotaX));
             int speedY = Math.max(3, Math.abs(velPelotaY));
 
-            // Tres variantes: izquierda, centro, derecha
             BolaPing bl = new BolaPing(xPos, yPos, b.getRadio(), -speedX, speedY, false);
             BolaPing bm = new BolaPing(xPos, yPos, b.getRadio(), 0, speedY, false);
             BolaPing br = new BolaPing(xPos, yPos, b.getRadio(), speedX, speedY, false);
 
-            // si hay multiplicador activo, aplicar a las nuevas
             if (bolaSpeedMultiplicador != null) {
                 bl.aplicarMultiplicadorVelocidad(bolaSpeedMultiplicador);
                 bm.aplicarMultiplicadorVelocidad(bolaSpeedMultiplicador);
@@ -434,7 +451,6 @@ public class GameWorld {
             nuevas.add(bm);
             nuevas.add(br);
         }
-        // sumar las nuevas a las pelotas actuales
         pelotas.addAll(nuevas);
     }
 
@@ -444,13 +460,9 @@ public class GameWorld {
         for (BolaPing b : pelotas) b.aplicarMultiplicadorVelocidad(mult);
     }
 
-    /**
-     * Duración en ms de la modificación del tamaño de la paleta / velocidad según dificultad.
-     * FACIL  -> 7000 ms
-     * MEDIA  -> 5000 ms
-     * DIFICIL-> 3000 ms
-     */
     private long getPaletaDurationMs() {
+        if (difficultyStrategy != null) return difficultyStrategy.getPaletaDurationMs();
+        // fallback
         switch (settings.dificultad) {
             case FACIL: return 7000L;
             case MEDIA: return 5000L;
@@ -521,20 +533,18 @@ public class GameWorld {
     public int getNivel() { return nivel; }
     public int getPuntaje() { return puntaje; }
     public DifficultySettings getSettings() { return settings; }
+
     public void reiniciarNivel() {
         crearBloques(filasParaNivel(nivel));
         powerUps.clear();
 
-        // Restaurar paleta si hay tamaño temporal activo
         if (paletaAnchoOriginal != null) {
             restaurarTamanoPaletaOriginal();
         }
 
-        // Limpiar efectos de velocidad sobre las bolas
         bolaSpeedMultiplicador = null;
         bolaSpeedExpiraMs = 0L;
 
-        // Reiniciar pelotas a una sola bola quieta sobre la paleta
         pelotas.clear();
         pelotas.add(new BolaPing(
                 paleta.getX() + paleta.getAncho()/2 - 5,
