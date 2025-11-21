@@ -6,20 +6,24 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.utils.TimeUtils;
+
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 /**
- * Mundo de juego con soporte de power-ups que caen al destruir bloques.
- * Ajustes:
- * - Probabilidad por dificultad y sesgo por nivel.
- * - Duración temporal para cambios de tamaño de paleta según dificultad:
- *     FACIL: 7s, MEDIA: 5s, DIFICIL: 3s
+ * Mundo de juego completo con:
+ * - múltiples pelotas (split)
+ * - power-ups (spawn, pickup por paleta, efectos)
+ * - bola explosiva (área)
+ * - SPEED_UP / SPEED_DOWN (temporal)
+ * - PADDLE_GROW / PADDLE_SHRINK (temporal)
+ * - lógica por dificultad para probabilidad y distribución de power-ups
  */
 public class GameWorld {
 
     private Plataforma paleta;
-    private BolaPing pelota;
+    private List<BolaPing> pelotas = new ArrayList<>(); // ahora manejo varias bolas
     private List<Bloque> bloques = new ArrayList<>();
     private final BlockFactory blockFactory;
     private DifficultySettings settings;
@@ -41,17 +45,22 @@ public class GameWorld {
     private final List<PowerUp> powerUps = new ArrayList<>();
 
     // Probabilidad base de que un bloque suelte un power-up (por bloque destruido).
-    private float probDropPowerUp = 0.18f; // 18% base
+    // Ajustable mediante setProbDropPowerUp(...)
+    private float probDropPowerUp = 0.25f; // 25% base
 
     // Bola explosiva
     private boolean bolaExplosivaActiva = false;
     private long bolaExplosivaHastaMs = 0;
     private final float radioExplosionPx = 90f; // área de efecto alrededor del bloque impactado
 
+    // Velocidad temporal para bolas
+    private Float bolaSpeedMultiplicador = null; // null = no activo
+    private long bolaSpeedExpiraMs = 0L;
+
     // ---- Temporal paddle size (duración según dificultad) ----
     // Si != null => tamaño temporal activo y contiene el ancho ORIGINAL a restaurar.
     private Integer paletaAnchoOriginal = null;
-    // momento en ms en que expira el tamaño temporal
+    // momento en ms que expira el tamaño temporal
     private long paletaTamanoExpiraMs = 0L;
 
     public GameWorld(BlockFactory factory,
@@ -78,8 +87,9 @@ public class GameWorld {
         powerUps.clear();
         bolaExplosivaActiva = false;
         bolaExplosivaHastaMs = 0;
+        bolaSpeedMultiplicador = null;
+        bolaSpeedExpiraMs = 0L;
 
-        // limpiar estado temporal de paleta
         paletaAnchoOriginal = null;
         paletaTamanoExpiraMs = 0L;
 
@@ -95,14 +105,15 @@ public class GameWorld {
         );
         paleta.setVelPxPorSeg(settings.velocidadPaleta);
 
-        pelota = new BolaPing(
+        pelotas.clear();
+        pelotas.add(new BolaPing(
                 (int)(Gdx.graphics.getWidth()/2f - 10),
                 paleta.getY() + paleta.getAlto() + 11,
                 10,
                 velPelotaX,
                 velPelotaY,
                 true
-        );
+        ));
         crearBloques(filasParaNivel(nivel));
     }
 
@@ -121,38 +132,47 @@ public class GameWorld {
     public void actualizar() {
         long ahora = TimeUtils.millis();
 
-        // Expiración de bola explosiva
+        // Expiraciones de efectos temporales
         if (bolaExplosivaActiva && ahora >= bolaExplosivaHastaMs) {
             bolaExplosivaActiva = false;
         }
-
-        // Restaurar tamaño de paleta si el temporal expiró
+        if (bolaSpeedMultiplicador != null && ahora >= bolaSpeedExpiraMs) {
+            // restaurar velocidad base en todas las bolas
+            for (BolaPing b : pelotas) b.restaurarVelBase();
+            bolaSpeedMultiplicador = null;
+            bolaSpeedExpiraMs = 0L;
+        }
         if (paletaAnchoOriginal != null && ahora >= paletaTamanoExpiraMs) {
             restaurarTamanoPaletaOriginal();
         }
 
         paleta.actualizar();
 
-        if (pelota.estaQuieta()) {
-            pelota.setXY(
-                    paleta.getX() + paleta.getAncho()/2 - 5,
-                    paleta.getY() + paleta.getAlto() + 11
-            );
-            if (Gdx.input.isKeyPressed(Input.Keys.SPACE)) pelota.setEstaQuieta(false);
-        } else {
-            pelota.actualizar();
+        // Actualizar pelotas
+        Iterator<BolaPing> it = pelotas.iterator();
+        while (it.hasNext()) {
+            BolaPing bp = it.next();
+            if (bp.estaQuieta()) {
+                bp.setXY(paleta.getX() + paleta.getAncho()/2 - 5, paleta.getY() + paleta.getAlto() + 11);
+                if (Gdx.input.isKeyPressed(Input.Keys.SPACE)) bp.setEstaQuieta(false);
+            } else {
+                bp.actualizar();
+            }
         }
 
-        if (pelota.getY() < 0) {
+        // Si todas las bolas cayeron, perder vida y reiniciar una bola
+        boolean algunaEnPantalla = false;
+        for (BolaPing bp : pelotas) {
+            if (bp.getY() + bp.getRadio() >= 0) { algunaEnPantalla = true; break; }
+        }
+        if (!algunaEnPantalla) {
             vidas--;
-            pelota = new BolaPing(
+            pelotas.clear();
+            pelotas.add(new BolaPing(
                     paleta.getX() + paleta.getAncho()/2 - 5,
                     paleta.getY() + paleta.getAlto() + 11,
-                    10,
-                    velPelotaX,
-                    velPelotaY,
-                    true
-            );
+                    10, velPelotaX, velPelotaY, true
+            ));
         }
 
         // Efecto: bola explosiva — detectar bloque impactado y aplicar daño en área
@@ -161,12 +181,13 @@ public class GameWorld {
             aplicarExplosionAlrededorDe(bloqueImpactado);
         }
 
-        // Colisiones normales de la bola con bloques
-        for (Bloque b : bloques) {
-            pelota.comprobarColision(b);
+        // Colisiones normales de cada bola con bloques y paleta
+        for (BolaPing bp : pelotas) {
+            for (Bloque b : bloques) {
+                bp.comprobarColision(b);
+            }
+            bp.comprobarColision(paleta);
         }
-        // y con la paleta
-        pelota.comprobarColision(paleta);
 
         // Procesar bloques destruidos: puntaje, drop de power-up y remover
         for (int i = 0; i < bloques.size(); i++) {
@@ -179,10 +200,10 @@ public class GameWorld {
             }
         }
 
-        // Actualizar power-ups cayendo y aplicar si tocan la paleta
+        // Actualizar power-ups cayendo y aplicar si tocan la paleta (solo si p.isActive())
         actualizarYAplicarPowerUps();
 
-        // Progreso de nivel
+        // Progreso de nivel (igual que antes)
         if (bloques.isEmpty()) {
             nivel++;
             if (settings.dificultad == Dificultad.MEDIA) {
@@ -212,11 +233,12 @@ public class GameWorld {
             }
 
             crearBloques(filasParaNivel(nivel));
-            pelota = new BolaPing(
+            pelotas.clear();
+            pelotas.add(new BolaPing(
                     paleta.getX() + paleta.getAncho()/2 - 5,
                     paleta.getY() + paleta.getAlto() + 11,
                     10, velPelotaX, velPelotaY, true
-            );
+            ));
         }
     }
 
@@ -224,120 +246,83 @@ public class GameWorld {
         // Batch: paleta, bloques, HUD
         batch.begin();
         paleta.dibujar(batch);
-        for (Bloque b : bloques) {
-            b.dibujar(batch);
-        }
+        for (Bloque b : bloques) b.dibujar(batch);
         hud.dibujar(batch, ancho, alto, puntaje, vidas, nivel, settings.dificultad,
                 mostrarBonificacionVidaHastaMs, TimeUtils.millis());
         batch.end();
 
-        // Shapes: pelota + power-ups
+        // Shapes: pelotas + power-ups
         sr.begin(ShapeRenderer.ShapeType.Filled);
-        pelota.dibujar(sr);
-        for (PowerUp p : powerUps) {
-            p.dibujar(sr);
-        }
+        for (BolaPing bp : pelotas) bp.dibujar(sr);
+        for (PowerUp p : powerUps) p.dibujar(sr);
         sr.end();
     }
 
-    public int getVidas() { return vidas; }
-    public int getNivel() { return nivel; }
-    public int getPuntaje() { return puntaje; }
-    public DifficultySettings getSettings() { return settings; }
-
-    public void reiniciarNivel() {
-        crearBloques(filasParaNivel(nivel));
-        powerUps.clear();
-        // limpiar estado temporal de paleta al reiniciar
-        paletaAnchoOriginal = null;
-        paletaTamanoExpiraMs = 0L;
-
-        pelota = new BolaPing(
-                paleta.getX() + paleta.getAncho()/2 - 5,
-                paleta.getY() + paleta.getAlto() + 11,
-                10, velPelotaX, velPelotaY, true
-        );
-        paleta = new Plataforma(paleta.getX(), paleta.getY(), paleta.getAncho(), paleta.getAlto(), texturaPaleta);
-        paleta.setVelPxPorSeg(settings.velocidadPaleta);
-    }
-
-    // --------------------- LÓGICA DE POWER-UPS ----------------------
+    // --------------------- power-up spawn / pickup ----------------------
 
     private void intentarSoltarPowerUp(Bloque b) {
-        // Ajusta la probabilidad por dificultad
         float prob = getProbDropPowerUpForDifficulty();
         if (Math.random() < prob) {
             PowerUpType tipo = sortearTipoPowerUp();
             int size = 22;
             int px = b.getX() + b.getAncho()/2 - size/2;
-            int py = b.getY() + b.getAlto()/2 - size/2;
+            // spawn justo debajo del bloque para evitar solapamiento con la bola que lo golpeó
+            int py = Math.max(0, b.getY() - size - 2);
             powerUps.add(new PowerUp(px, py, size, size, tipo));
         }
     }
 
     private float getProbDropPowerUpForDifficulty() {
         switch (settings.dificultad) {
-            case FACIL:
-                return probDropPowerUp * 1.25f; // más frecuentes en fácil
-            case MEDIA:
-                return probDropPowerUp;         // base para media
-            case DIFICIL:
-                return probDropPowerUp * 0.7f;  // menos en difícil
-            default:
-                return probDropPowerUp;
+            case FACIL: return probDropPowerUp * 1.25f;
+            case MEDIA: return probDropPowerUp;
+            case DIFICIL: return probDropPowerUp * 0.7f;
+            default: return probDropPowerUp;
         }
     }
 
     /**
      * Sortea tipo de power-up según dificultad y nivel.
+     * Incluye SPLIT_BALL, SPEED_UP y SPEED_DOWN en la distribución.
      */
     private PowerUpType sortearTipoPowerUp() {
-        // Probabilidades base por dificultad (suman 1.0)
-        double grow, shrink, explosive, life;
+        // probabilidades base por dificultad (suman aproximadamente 1.0)
+        double grow, shrink, explosive, life, split, sUp, sDown;
 
         switch (settings.dificultad) {
             case FACIL:
-                grow = 0.50;
-                shrink = 0.10;
-                explosive = 0.20;
-                life = 0.20;
+                grow = 0.40; shrink = 0.10; explosive = 0.15; life = 0.20; split = 0.10; sUp = 0.03; sDown = 0.02;
                 break;
             case MEDIA:
-                grow = 0.35;
-                shrink = 0.25;
-                explosive = 0.20;
-                life = 0.20;
+                grow = 0.30; shrink = 0.20; explosive = 0.15; life = 0.15; split = 0.12; sUp = 0.05; sDown = 0.03;
                 break;
             case DIFICIL:
-                grow = 0.20;
-                shrink = 0.50;
-                explosive = 0.20;
-                life = 0.10;
+                grow = 0.15; shrink = 0.45; explosive = 0.15; life = 0.05; split = 0.12; sUp = 0.06; sDown = 0.02;
                 break;
             default:
-                grow = 0.35; shrink = 0.25; explosive = 0.20; life = 0.20;
+                grow = 0.30; shrink = 0.25; explosive = 0.15; life = 0.15; split = 0.10; sUp = 0.03; sDown = 0.02;
         }
 
-        // Sesgo por nivel: a más nivel, menos chance de útiles (grow + life) y más a shrink.
+        // Sesgo por nivel: a más nivel, menos chance de útiles (grow + life + sUp) y más a shrink
         double levelSkew = Math.min(0.25, Math.max(0.0, (nivel - 1) * 0.02));
-
-        double utilesSum = grow + life;
+        double utilesSum = grow + life + sUp; // consideramos sUp como "útil"
         if (utilesSum > 0 && levelSkew > 0) {
             double reducTotal = utilesSum * levelSkew;
             double growRed = (grow / utilesSum) * reducTotal;
             double lifeRed = (life / utilesSum) * reducTotal;
+            double upRed = (sUp / utilesSum) * reducTotal;
 
             grow = Math.max(0.0, grow - growRed);
             life = Math.max(0.0, life - lifeRed);
+            sUp = Math.max(0.0, sUp - upRed);
 
-            shrink += growRed + lifeRed;
+            shrink += (growRed + lifeRed + upRed);
         }
 
-        double suma = grow + shrink + explosive + life;
-        if (suma <= 0) {
-            return PowerUpType.PADDLE_SHRINK;
-        }
-        grow /= suma; shrink /= suma; explosive /= suma; life /= suma;
+        double suma = grow + shrink + explosive + life + split + sUp + sDown;
+        if (suma <= 0) return PowerUpType.PADDLE_SHRINK;
+
+        grow /= suma; shrink /= suma; explosive /= suma; life /= suma; split /= suma; sUp /= suma; sDown /= suma;
 
         double r = Math.random();
         if (r < grow) return PowerUpType.PADDLE_GROW;
@@ -345,25 +330,29 @@ public class GameWorld {
         if (r < shrink) return PowerUpType.PADDLE_SHRINK;
         r -= shrink;
         if (r < explosive) return PowerUpType.EXPLOSIVE_BALL;
-        return PowerUpType.EXTRA_LIFE;
+        r -= explosive;
+        if (r < life) return PowerUpType.EXTRA_LIFE;
+        r -= life;
+        if (r < split) return PowerUpType.SPLIT_BALL;
+        r -= split;
+        if (r < sUp) return PowerUpType.SPEED_UP;
+        return PowerUpType.SPEED_DOWN;
     }
 
     private void actualizarYAplicarPowerUps() {
         Rectangle rectPaleta = paleta.getRect();
-
         for (int i = 0; i < powerUps.size(); i++) {
             PowerUp p = powerUps.get(i);
             p.actualizar();
 
-            // Fuera de la pantalla
-            if (p.getY() + p.getAlto() < 0) {
-                powerUps.remove(i); i--; continue;
-            }
+            // Fuera de la pantalla -> eliminar
+            if (p.getY() + p.getAlto() < 0) { powerUps.remove(i); i--; continue; }
 
-            // ¿Toca la paleta?
-            if (p.getRect().overlaps(rectPaleta)) {
+            // Solo permitir pickup por paleta si el powerup ya es activo (pasó el small delay)
+            if (p.isActive() && p.getRect().overlaps(rectPaleta)) {
                 aplicarPowerUp(p.getTipo());
-                powerUps.remove(i); i--;
+                powerUps.remove(i);
+                i--;
             }
         }
     }
@@ -376,7 +365,6 @@ public class GameWorld {
                 bolaExplosivaHastaMs = ahora + 8000; // 8s
                 break;
             case PADDLE_GROW: {
-                // Guardar ancho original si no está guardado
                 if (paletaAnchoOriginal == null) paletaAnchoOriginal = paleta.getAncho();
 
                 int nuevoAncho = Math.min(260, paleta.getAncho() + 30);
@@ -386,7 +374,6 @@ public class GameWorld {
                 paleta = new Plataforma(nuevoX, paleta.getY(), nuevoAncho, paleta.getAlto(), texturaPaleta);
                 paleta.setVelPxPorSeg(settings.velocidadPaleta);
 
-                // establecer/actualizar expiración según dificultad
                 paletaTamanoExpiraMs = ahora + getPaletaDurationMs();
                 break;
             }
@@ -407,14 +394,61 @@ public class GameWorld {
                 vidas++;
                 mostrarBonificacionVidaHastaMs = ahora + duracionBonificacionVida;
                 break;
+            case SPLIT_BALL:
+                splitBalls();
+                break;
+            case SPEED_UP:
+                applyBallSpeedMultiplier(1.5f, getPaletaDurationMs());
+                break;
+            case SPEED_DOWN:
+                applyBallSpeedMultiplier(0.6f, getPaletaDurationMs());
+                break;
         }
     }
 
     /**
-     * Duración en ms de la modificación del tamaño de la paleta según dificultad.
+     * Split: por cada bola existente, añadimos 2 bolas más con direcciones distintas.
+     * Comportamiento: SUMA nuevas bolas a las existentes (más presión).
+     */
+    private void splitBalls() {
+        List<BolaPing> nuevas = new ArrayList<>();
+        for (BolaPing b : pelotas) {
+            int yPos = b.getY();
+            int xPos = b.getX();
+            int speedX = Math.max(2, Math.abs(velPelotaX));
+            int speedY = Math.max(3, Math.abs(velPelotaY));
+
+            // Tres variantes: izquierda, centro, derecha
+            BolaPing bl = new BolaPing(xPos, yPos, b.getRadio(), -speedX, speedY, false);
+            BolaPing bm = new BolaPing(xPos, yPos, b.getRadio(), 0, speedY, false);
+            BolaPing br = new BolaPing(xPos, yPos, b.getRadio(), speedX, speedY, false);
+
+            // si hay multiplicador activo, aplicar a las nuevas
+            if (bolaSpeedMultiplicador != null) {
+                bl.aplicarMultiplicadorVelocidad(bolaSpeedMultiplicador);
+                bm.aplicarMultiplicadorVelocidad(bolaSpeedMultiplicador);
+                br.aplicarMultiplicadorVelocidad(bolaSpeedMultiplicador);
+            }
+
+            nuevas.add(bl);
+            nuevas.add(bm);
+            nuevas.add(br);
+        }
+        // sumar las nuevas a las pelotas actuales
+        pelotas.addAll(nuevas);
+    }
+
+    private void applyBallSpeedMultiplier(float mult, long durationMs) {
+        bolaSpeedMultiplicador = mult;
+        bolaSpeedExpiraMs = TimeUtils.millis() + durationMs;
+        for (BolaPing b : pelotas) b.aplicarMultiplicadorVelocidad(mult);
+    }
+
+    /**
+     * Duración en ms de la modificación del tamaño de la paleta / velocidad según dificultad.
      * FACIL  -> 7000 ms
      * MEDIA  -> 5000 ms
-     * DIFICIL -> 3000 ms
+     * DIFICIL-> 3000 ms
      */
     private long getPaletaDurationMs() {
         switch (settings.dificultad) {
@@ -439,14 +473,13 @@ public class GameWorld {
     }
 
     private Bloque detectarImpactoConAlgúnBloque() {
-        if (pelota.estaQuieta()) return null;
-        int cx = pelota.getX();
-        int cy = pelota.getY();
-        int r  = pelota.getRadio();
-
-        for (Bloque b : bloques) {
-            if (circleIntersectsRect(cx, cy, r, b.getRect())) {
-                return b;
+        for (BolaPing b : pelotas) {
+            if (b.estaQuieta()) continue;
+            int cx = b.getX();
+            int cy = b.getY();
+            int r  = b.getRadio();
+            for (Bloque bl : bloques) {
+                if (circleIntersectsRect(cx, cy, r, bl.getRect())) return bl;
             }
         }
         return null;
@@ -456,20 +489,15 @@ public class GameWorld {
         float cx = impactado.getX() + impactado.getAncho() / 2f;
         float cy = impactado.getY() + impactado.getAlto() / 2f;
         float r2 = radioExplosionPx * radioExplosionPx;
-
         for (Bloque b : bloques) {
             if (b == impactado) continue;
             if (b.esIrrompible()) continue;
-
             float bx = b.getX() + b.getAncho() / 2f;
             float by = b.getY() + b.getAlto() / 2f;
             float dx = bx - cx;
             float dy = by - cy;
-            if (dx*dx + dy*dy <= r2) {
-                b.destruir();
-            }
+            if (dx*dx + dy*dy <= r2) b.destruir();
         }
-        // El bloque impactado en sí ya recibirá daño por la colisión normal.
     }
 
     private boolean circleIntersectsRect(int cx, int cy, int radius, Rectangle r) {
@@ -486,7 +514,32 @@ public class GameWorld {
         return v;
     }
 
-    public void setProbDropPowerUp(float prob) {
-        this.probDropPowerUp = Math.max(0f, Math.min(1f, prob));
+    public void setProbDropPowerUp(float prob) { this.probDropPowerUp = Math.max(0f, Math.min(1f, prob)); }
+
+    // ---------- Getters expuestos para Main / HUD ----------
+    public int getVidas() { return vidas; }
+    public int getNivel() { return nivel; }
+    public int getPuntaje() { return puntaje; }
+    public DifficultySettings getSettings() { return settings; }
+    public void reiniciarNivel() {
+        crearBloques(filasParaNivel(nivel));
+        powerUps.clear();
+
+        // Restaurar paleta si hay tamaño temporal activo
+        if (paletaAnchoOriginal != null) {
+            restaurarTamanoPaletaOriginal();
+        }
+
+        // Limpiar efectos de velocidad sobre las bolas
+        bolaSpeedMultiplicador = null;
+        bolaSpeedExpiraMs = 0L;
+
+        // Reiniciar pelotas a una sola bola quieta sobre la paleta
+        pelotas.clear();
+        pelotas.add(new BolaPing(
+                paleta.getX() + paleta.getAncho()/2 - 5,
+                paleta.getY() + paleta.getAlto() + 11,
+                10, velPelotaX, velPelotaY, true
+        ));
     }
 }

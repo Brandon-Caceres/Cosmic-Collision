@@ -6,12 +6,15 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 
 /**
- * Pelota (bola). Usa ShapeRenderer para dibujarse.
+ * Pelota con la misma lógica original de rebotes y arranque.
+ * Añadido: almacena velocidades base para poder aplicar y revertir multiplicadores.
  */
 public class BolaPing extends ObjetoJuego {
     private int radio;
     private int velX;
     private int velY;
+    private int baseVelX;
+    private int baseVelY;
     private Color color = Color.WHITE;
     private boolean quieta;
 
@@ -20,6 +23,8 @@ public class BolaPing extends ObjetoJuego {
         this.radio = radio;
         this.velX = velX;
         this.velY = velY;
+        this.baseVelX = velX;
+        this.baseVelY = velY;
         this.quieta = iniciaQuieta;
     }
 
@@ -42,7 +47,6 @@ public class BolaPing extends ObjetoJuego {
         if (quieta) return;
         x += velX;
         y += velY;
-
         if (x - radio < 0) {
             x = radio;
             velX = -velX;
@@ -50,7 +54,6 @@ public class BolaPing extends ObjetoJuego {
             x = Gdx.graphics.getWidth() - radio;
             velX = -velX;
         }
-
         if (y + radio > Gdx.graphics.getHeight()) {
             y = Gdx.graphics.getHeight() - radio;
             velY = -velY;
@@ -77,5 +80,38 @@ public class BolaPing extends ObjetoJuego {
             velY = -velY;
             c.alChocarConBola(this);
         }
+    }
+
+    // ----------------- velocidad dinámica -----------------
+
+    // Aplica multiplicador (m > 0). Se basa en baseVelX/baseVelY para evitar drift.
+    public void aplicarMultiplicadorVelocidad(float m) {
+        if (m <= 0f) return;
+        int signX = velX >= 0 ? 1 : -1;
+        int signY = velY >= 0 ? 1 : -1;
+        int nvx = Math.max(1, Math.round(Math.abs(baseVelX * m)));
+        int nvy = Math.max(1, Math.round(Math.abs(baseVelY * m)));
+        velX = signX * nvx;
+        velY = signY * nvy;
+    }
+
+    // Restaurar a baseVel
+    public void restaurarVelBase() {
+        // conservar signo actual si base es 0 improbable, así que asignar base
+        int signX = baseVelX >= 0 ? 1 : -1;
+        int signY = baseVelY >= 0 ? 1 : -1;
+        velX = signX * Math.abs(baseVelX);
+        velY = signY * Math.abs(baseVelY);
+    }
+
+    // Cuando creamos nuevas bolas por split, permitir ajustar su velocidad base
+    public void setBaseVelocities(int baseX, int baseY) {
+        this.baseVelX = baseX;
+        this.baseVelY = baseY;
+        // actualizar vel según signo actual (mantener dirección)
+        int signX = velX >= 0 ? 1 : -1;
+        int signY = velY >= 0 ? 1 : -1;
+        this.velX = signX * Math.abs(baseX);
+        this.velY = signY * Math.abs(baseY);
     }
 }
