@@ -7,9 +7,9 @@ import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 
 /**
- * Pantalla de Tutorial con save/restore de escala de fuente.
+ * TutorialScreen ahora extiende AbstractScreen.
  */
-public class TutorialScreen {
+public class TutorialScreen extends AbstractScreen {
 
     public interface Listener { void onSalirMenu(); }
 
@@ -20,28 +20,35 @@ public class TutorialScreen {
     private final GlyphLayout layout = new GlyphLayout();
     private final Listener listener;
 
-    public TutorialScreen(BitmapFont fuente, Listener listener) {
+    public TutorialScreen(SpriteBatch batch, BitmapFont fuente, Listener listener) {
+        super(batch);
         this.fuente = fuente;
         this.listener = listener;
     }
 
-    public void render(SpriteBatch batch, float ancho, float alto) {
+    @Override
+    protected void onUpdate(float delta) {
+        if (just(Input.Keys.ESCAPE) || just(Input.Keys.ENTER)) listener.onSalirMenu();
+        if (just(Input.Keys.RIGHT)) pagina = Math.min(pagina + 1, MAX_PAGINAS);
+        if (just(Input.Keys.LEFT))  pagina = Math.max(pagina - 1, 1);
+    }
+
+    @Override
+    protected void onDraw(SpriteBatch batch, float delta) {
         float oldX = fuente.getData().scaleX, oldY = fuente.getData().scaleY;
 
         batch.begin();
         batch.setColor(1f,1f,1f,1f);
 
-        // Título
         fuente.getData().setScale(3.0f);
         String titulo = "TUTORIAL DEL JUEGO (" + pagina + " de " + MAX_PAGINAS + ")";
         layout.setText(fuente, titulo);
-        fuente.draw(batch, titulo, (ancho - layout.width)/2f, alto - 80);
+        fuente.draw(batch, titulo, (Gdx.graphics.getWidth() - layout.width)/2f, Gdx.graphics.getHeight() - 80);
 
-        float y = alto - 150;
+        float y = Gdx.graphics.getHeight() - 150;
         float inter = 44f;
         float x0 = 80;
 
-        // Contenido
         fuente.getData().setScale(1.8f);
         if (pagina == 1) {
             draw(batch, "OBJETIVO PRINCIPAL:", x0, y); y -= inter;
@@ -69,26 +76,18 @@ public class TutorialScreen {
             draw(batch, "SELECCIONAR: ENTER / ESPACIO", x0 + 30, y); y -= inter;
         }
 
-        // Pista navegación
         fuente.getData().setScale(2.5f);
         String pista = "IZQ/DER: Cambiar página | ESC/ENTER: Menú Principal";
         layout.setText(fuente, pista);
-        fuente.draw(batch, pista, (ancho - layout.width)/2f, 100);
+        fuente.draw(batch, pista, (Gdx.graphics.getWidth() - layout.width)/2f, 100);
 
         batch.end();
 
-        // Restaurar
         fuente.getData().setScale(oldX, oldY);
     }
 
     private void draw(SpriteBatch batch, String txt, float x, float y) {
         fuente.draw(batch, txt, x, y);
-    }
-
-    public void handleInput() {
-        if (just(Input.Keys.ESCAPE) || just(Input.Keys.ENTER)) listener.onSalirMenu();
-        if (just(Input.Keys.RIGHT)) pagina = Math.min(pagina + 1, MAX_PAGINAS);
-        if (just(Input.Keys.LEFT))  pagina = Math.max(pagina - 1, 1);
     }
 
     private boolean just(int key) { return Gdx.input.isKeyJustPressed(key); }

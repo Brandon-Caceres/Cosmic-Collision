@@ -7,9 +7,9 @@ import com.badlogic.gdx.graphics.g2d.GlyphLayout;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 
 /**
- * Pantalla de menú: guarda/restaura escala de fuente para no afectar otras pantallas.
+ * MenuScreen refactorizada para extender AbstractScreen (Template Method).
  */
-public class MenuScreen {
+public class MenuScreen extends AbstractScreen {
 
     public interface Listener {
         void onElegirDificultad(Dificultad d);
@@ -21,26 +21,37 @@ public class MenuScreen {
     private final GlyphLayout layout = new GlyphLayout();
     private final Listener listener;
 
-    public MenuScreen(BitmapFont fuente, Listener listener) {
+    public MenuScreen(SpriteBatch batch, BitmapFont fuente, Listener listener) {
+        super(batch);
         this.fuente = fuente;
-    this.listener = listener;
+        this.listener = listener;
     }
 
-    public void render(SpriteBatch batch, float ancho, float alto) {
+    @Override
+    protected void onUpdate(float delta) {
+        if (just(Input.Keys.NUM_1) || just(Input.Keys.F1)) listener.onElegirDificultad(Dificultad.FACIL);
+        else if (just(Input.Keys.NUM_2) || just(Input.Keys.F2)) listener.onElegirDificultad(Dificultad.MEDIA);
+        else if (just(Input.Keys.NUM_3) || just(Input.Keys.F3)) listener.onElegirDificultad(Dificultad.DIFICIL);
+        else if (just(Input.Keys.NUM_4) || just(Input.Keys.F4)) listener.onTutorial();
+        else if (just(Input.Keys.NUM_5) || just(Input.Keys.F5)) listener.onCreditos();
+    }
+
+    @Override
+    protected void onDraw(SpriteBatch batch, float delta) {
         float oldX = fuente.getData().scaleX, oldY = fuente.getData().scaleY;
         fuente.getData().setScale(2.0f);
 
         batch.begin();
         batch.setColor(1f,1f,1f,1f);
 
-        drawCentered(batch, "COSMIC COLLISION", ancho, alto - 60);
-        drawCentered(batch, "Elige dificultad:", ancho, alto - 108);
-        drawCentered(batch, "1 (F1) - FÁCIL   | Paleta grande, bola lenta", ancho, alto - 156);
-        drawCentered(batch, "2 (F2) - MEDIA   | Más bloques, duros", ancho, alto - 204);
-        drawCentered(batch, "3 (F3) - DIFÍCIL | Más bloques, duros e irrompibles", ancho, alto - 252);
-        drawCentered(batch, "4 (F4) - TUTORIAL | Ver controles e instrucciones", ancho, alto - 300);
-        drawCentered(batch, "5 (F5) - CRÉDITOS | Ver información del desarrollo", ancho, alto - 348);
-        drawCentered(batch, "Controles: IZQ/DER, ESPACIO lanzar, ESC pausa", ancho, 80);
+        drawCentered(batch, "COSMIC COLLISION", Gdx.graphics.getWidth(), Gdx.graphics.getHeight() - 60);
+        drawCentered(batch, "Elige dificultad:", Gdx.graphics.getWidth(), Gdx.graphics.getHeight() - 108);
+        drawCentered(batch, "1 (F1) - FÁCIL   | Paleta grande, bola lenta", Gdx.graphics.getWidth(), Gdx.graphics.getHeight() - 156);
+        drawCentered(batch, "2 (F2) - MEDIA   | Más bloques, duros", Gdx.graphics.getWidth(), Gdx.graphics.getHeight() - 204);
+        drawCentered(batch, "3 (F3) - DIFÍCIL | Más bloques, duros e irrompibles", Gdx.graphics.getWidth(), Gdx.graphics.getHeight() - 252);
+        drawCentered(batch, "4 (F4) - TUTORIAL | Ver controles e instrucciones", Gdx.graphics.getWidth(), Gdx.graphics.getHeight() - 300);
+        drawCentered(batch, "5 (F5) - CRÉDITOS | Ver información del desarrollo", Gdx.graphics.getWidth(), Gdx.graphics.getHeight() - 348);
+        drawCentered(batch, "Controles: IZQ/DER, ESPACIO lanzar, ESC pausa", Gdx.graphics.getWidth(), 80);
         batch.end();
 
         fuente.getData().setScale(oldX, oldY);
@@ -49,14 +60,6 @@ public class MenuScreen {
     private void drawCentered(SpriteBatch batch, String text, float ancho, float y) {
         layout.setText(fuente, text);
         fuente.draw(batch, text, (ancho - layout.width) / 2f, y);
-    }
-
-    public void handleInput() {
-        if (just(Input.Keys.NUM_1) || just(Input.Keys.F1)) listener.onElegirDificultad(Dificultad.FACIL);
-        else if (just(Input.Keys.NUM_2) || just(Input.Keys.F2)) listener.onElegirDificultad(Dificultad.MEDIA);
-        else if (just(Input.Keys.NUM_3) || just(Input.Keys.F3)) listener.onElegirDificultad(Dificultad.DIFICIL);
-        else if (just(Input.Keys.NUM_4) || just(Input.Keys.F4)) listener.onTutorial();
-        else if (just(Input.Keys.NUM_5) || just(Input.Keys.F5)) listener.onCreditos();
     }
 
     private boolean just(int key) {

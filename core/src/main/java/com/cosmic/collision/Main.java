@@ -10,7 +10,11 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 
 /**
- * Clase principal: delega en objetos especializados.
+ * Main
+ * - ResourceManager (Singleton) para assets.
+ * - DefaultBlockFactory (Abstract Factory) para crear bloques.
+ * - DifficultyStrategy (Strategy) ya integrado en GameWorld.
+ * - Pantallas migradas a AbstractScreen (Template Method): menu.render(delta), tutorial.render(delta), credits.render(delta).
  */
 public class Main extends ApplicationAdapter {
 
@@ -57,6 +61,7 @@ public class Main extends ApplicationAdapter {
         fuenteHUD = new BitmapFont();
         fuenteHUD.getData().setScale(2.0f);
 
+        // Carga texturas vía ResourceManager (singleton)
         ResourceManager rm = ResourceManager.getInstance();
         texturaFondo = rm.getTexture("fondo", "espacio.jpg");
         texturaPaleta = rm.getTexture("paleta", "nave.png");
@@ -68,11 +73,13 @@ public class Main extends ApplicationAdapter {
         ajustes = new DifficultySettings(dificultadActual);
         hud = new HUD(fuenteHUD);
 
+        // Usar fábrica concreta pasando texturas ya cargadas (evita duplicar cargas)
         blockFactory = new DefaultBlockFactory(texturaAsteroideNormal, texturaAsteroideDuro2, texturaAsteroideDuro3, texturaAsteroideIrrompible);
+
         mundo = new GameWorld(blockFactory, hud, ajustes, duracionBonificacionVida, texturaPaleta);
 
-        // Pantallas con API clásica (a migrar en commit 4 - Template Method)
-        menu = new MenuScreen(fuenteUI, new MenuScreen.Listener() {
+        // Crear pantallas que extienden AbstractScreen (reciben lote como SpriteBatch)
+        menu = new MenuScreen(lote, fuenteUI, new MenuScreen.Listener() {
             @Override public void onElegirDificultad(Dificultad d) {
                 dificultadActual = d;
                 ajustes = new DifficultySettings(dificultadActual);
@@ -94,12 +101,14 @@ public class Main extends ApplicationAdapter {
             @Override public void onSalir() { Gdx.app.exit(); }
         });
 
-        tutorial = new TutorialScreen(fuenteUI, () -> estado = GameState.MENU);
-        creditos = new CreditsScreen(fuenteUI, () -> estado = GameState.MENU);
+        tutorial = new TutorialScreen(lote, fuenteUI, () -> estado = GameState.MENU);
+        creditos = new CreditsScreen(lote, fuenteUI, () -> estado = GameState.MENU);
     }
 
     @Override
     public void render() {
+        float delta = Gdx.graphics.getDeltaTime();
+
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         camara.update();
         lote.setProjectionMatrix(camara.combined);
@@ -107,8 +116,8 @@ public class Main extends ApplicationAdapter {
 
         switch (estado) {
             case MENU:
-                menu.render(lote, camara.viewportWidth, camara.viewportHeight);
-                menu.handleInput();
+                // AbstractScreen: render(delta) invoca onUpdate/onDraw internamente
+                menu.render(delta);
                 break;
 
             case JUGANDO:
@@ -126,6 +135,7 @@ public class Main extends ApplicationAdapter {
 
             case PAUSADO:
                 dibujarFondo();
+                // Dibujar estado actual sin actualizar
                 mundo.dibujar(lote, formas, camara.viewportWidth, camara.viewportHeight);
                 pausa.render(lote, formas, camara.viewportWidth, camara.viewportHeight);
                 pausa.handleInput();
@@ -133,15 +143,12 @@ public class Main extends ApplicationAdapter {
 
             case TUTORIAL:
                 dibujarFondo();
-                tutorial.render(lote, camara.viewportWidth, camara.viewportHeight);
-                tutorial.handleInput();
+                tutorial.render(delta);
                 break;
 
             case CREDITOS:
                 dibujarFondo();
-                creditos.actualizar(Gdx.graphics.getDeltaTime());
-                creditos.render(lote, camara.viewportWidth, camara.viewportHeight);
-                creditos.handleInput();
+                creditos.render(delta);
                 break;
 
             case FIN_DE_JUEGO:
@@ -212,7 +219,7 @@ public class Main extends ApplicationAdapter {
         formas.dispose();
         fuenteUI.dispose();
         fuenteHUD.dispose();
-        // El ResourceManager libera las texturas centralmente
+        // Dispose centralizado del ResourceManager
         ResourceManager.getInstance().dispose();
     }
 }
