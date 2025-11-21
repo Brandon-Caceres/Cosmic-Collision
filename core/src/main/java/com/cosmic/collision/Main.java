@@ -11,7 +11,6 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 
 /**
  * Clase principal: delega en objetos especializados.
- * Separa fuente para UI y HUD para evitar "fugas" de escala.
  */
 public class Main extends ApplicationAdapter {
 
@@ -58,16 +57,18 @@ public class Main extends ApplicationAdapter {
         fuenteHUD = new BitmapFont();
         fuenteHUD.getData().setScale(2.0f);
 
-        // Carga texturas
-        texturaFondo = new com.badlogic.gdx.graphics.Texture(Gdx.files.internal("espacio.jpg"));
-        texturaPaleta = new com.badlogic.gdx.graphics.Texture(Gdx.files.internal("nave.png"));
-        texturaAsteroideNormal = new com.badlogic.gdx.graphics.Texture(Gdx.files.internal("AsteroideE.png"));
-        texturaAsteroideDuro2 = new com.badlogic.gdx.graphics.Texture(Gdx.files.internal("AsteroideM.png"));
-        texturaAsteroideDuro3 = new com.badlogic.gdx.graphics.Texture(Gdx.files.internal("AsteroideH.png"));
-        texturaAsteroideIrrompible = new com.badlogic.gdx.graphics.Texture(Gdx.files.internal("AsteroideI.png"));
+        // Carga texturas vía ResourceManager (singleton)
+        ResourceManager rm = ResourceManager.getInstance();
+        texturaFondo = rm.getTexture("fondo", "espacio.jpg");
+        texturaPaleta = rm.getTexture("paleta", "nave.png");
+        texturaAsteroideNormal = rm.getTexture("ast_normal", "AsteroideE.png");
+        texturaAsteroideDuro2 = rm.getTexture("ast_duro2", "AsteroideM.png");
+        texturaAsteroideDuro3 = rm.getTexture("ast_duro3", "AsteroideH.png");
+        texturaAsteroideIrrompible = rm.getTexture("ast_unb", "AsteroideI.png");
 
         ajustes = new DifficultySettings(dificultadActual);
         hud = new HUD(fuenteHUD);
+
         blockFactory = new BlockFactory(texturaAsteroideNormal, texturaAsteroideDuro2, texturaAsteroideDuro3, texturaAsteroideIrrompible);
         mundo = new GameWorld(blockFactory, hud, ajustes, duracionBonificacionVida, texturaPaleta);
 
@@ -212,11 +213,7 @@ public class Main extends ApplicationAdapter {
         formas.dispose();
         fuenteUI.dispose();
         fuenteHUD.dispose();
-        texturaFondo.dispose();
-        texturaPaleta.dispose();
-        texturaAsteroideNormal.dispose();
-        texturaAsteroideDuro2.dispose();
-        texturaAsteroideDuro3.dispose();
-        texturaAsteroideIrrompible.dispose();
+        // El ResourceManager libera las texturas centralmente
+        ResourceManager.getInstance().dispose();
     }
 }
