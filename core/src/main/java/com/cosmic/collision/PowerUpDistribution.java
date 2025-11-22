@@ -1,18 +1,24 @@
 package com.cosmic.collision;
 
 /**
- * Estructura simple para almacenar probabilidades base de cada tipo de power-up.
+ * Probabilidades base por tipo de power-up. Se normalizan antes de sortear.
  */
 public class PowerUpDistribution {
-    public double grow;     // PADDLE_GROW
-    public double shrink;   // PADDLE_SHRINK
-    public double explosive; // EXPLOSIVE_BALL
-    public double life;     // EXTRA_LIFE
-    public double split;    // SPLIT_BALL
-    public double speedUp;  // SPEED_UP
-    public double speedDown; // SPEED_DOWN
+    public double grow;
+    public double shrink;
+    public double explosive;
+    public double life;
+    public double split;
+    public double speedUp;
+    public double speedDown;
 
-    public PowerUpDistribution(double grow, double shrink, double explosive, double life, double split, double speedUp, double speedDown) {
+    public PowerUpDistribution(double grow,
+                               double shrink,
+                               double explosive,
+                               double life,
+                               double split,
+                               double speedUp,
+                               double speedDown) {
         this.grow = grow;
         this.shrink = shrink;
         this.explosive = explosive;
